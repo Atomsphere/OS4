@@ -27,50 +27,54 @@ void printRefString(vector<int> vec) {
 	cout << endl;
 }
 
-void printState(vector<int> arr, vector<int> count, int size) {
-	for (int i = 0; i < size; ++i) {
-		cout << "Frame " << i << ": " << arr[i] << " - " << count[i] << endl;
+void printState(vector<int> frames, vector<int> count) {
+	for (int i = 0; i < frames.size(); ++i) {
+		cout << "Frame " << i << ": page- " << frames[i] << " time last used- " << count[i] << endl;
 	}
+	cout << endl;
 }
 //********************************
-//simulaes the least recently used algorithm as it would operate
+//simulates the least recently used algorithm as it would operate
 //in a page/frame scheme
 //*************************
-void lru(vector<int> frames, int size, vector<int> vec) {
-	srand(time(NULL));
-
+int lru(int size, vector<int> pages) {
+	
+	vector<int> frames;
 	cout << "Least recently used-\nFrames: " << size << "\nreference string: ";
-	printRefString(vec);
+	printRefString(pages);
 	vector<int> counter;
 	bool fault;
 	int index;
-	for (int i = 0; i < vec.size(); i++) {
+	int faultcount = 0;
+	for (int i = 0; i < pages.size(); i++) {
 		if (frames.size() < size) {
-			frames.push_back(vec[i]);
-			cout << "Frame " << i << " initialized with " << vec[i] << endl;
+			frames.push_back(pages[i]);
+			cout << "Frame " << i << " initialized with " << pages[i] << endl;
 			counter.push_back(0);
 			for (int j = 0; j < i; ++j) {
 				counter[j]++;
 			}
+			cout << "current status: \n";
+			printState(frames, counter);
 		}else{
 			fault = true;
 			for (int j = 0; j < size; j++) {
-				if (vec[i] == frames[j]) {
+				if (pages[i] == frames[j]) {
 					fault = false;
 					for (int k = 0; k < size; k++) {
 						counter[k]++;
 					}
 					counter[j] = 0;
-					cout << "Page " << vec[i] << " found at location " << j
+					cout << "Page " << pages[i] << " found at location " << j
 						<< "\n current status: \n";
-					printState(frames, counter, size);
+					printState(frames, counter);
 				}
 			}
 
 			if (fault) {
 				int lastUsed = -1;
 				index = 0;
-				for (int j = 0; i < size; i++) {
+				for (int j = 0; j < size; ++j) {
 					if (counter[j] > lastUsed) {
 						lastUsed = counter[j];
 						index = j;
@@ -82,31 +86,91 @@ void lru(vector<int> frames, int size, vector<int> vec) {
 						}
 					}
 				}
-				cout << "Page fault!- " << frames[index] << " is being replaced with " << vec[i]
+				cout << "Page fault!- " << frames[index] << " is being replaced with " << pages[i]
 					<< " at frame " << index << "\ncurrent status: \n";
-				frames[index] = vec[i];
+				frames[index] = pages[i];
 				for (int j = 0; j < size; ++j) {
 					counter[j]++;
 				}
 				counter[index] = 0;
-				printState(frames, counter, size);
-				cout << endl;
+				printState(frames, counter);
+				faultcount++;
 			}
 		}
 	}
+	return faultcount;
 }
 
-void optimal(vector<int> frames, int size, vector<int> vec) {
-	cout << "Optimal-\nFrames: " << size << "\nreference string: ";
-	printRefString(vec);
-	int * counter = new int [size];
+vector<int> mapping(vector<int> frames, vector<int> pages, int start) {
+	vector<int> distance;
+	for (int frameit = 0; frameit < frames.size(); ++frameit) {
+		distance.push_back(4096);
+		for (int i = start; i < pages.size(); ++i) {
+			if (distance[frameit] == 4096 && frames[frameit] == pages[i]) {
+				distance[frameit] = i - start;
+			}
+		}
+	}
+	return distance;
 }
+
+int optimal(int size, vector<int> pages) {
+	cout << "Optimal-\nFrames: " << size << "\nreference string: ";
+	printRefString(pages);
+	int faultcount = 0;
+	vector<int> frames;
+	vector<int> distance;
+	int furthest;
+	int index;
+	bool fault;
+	for (int i = 0; i < pages.size(); i++) {
+		if (frames.size() < size) {
+			frames.push_back(pages[i]);
+			cout << "Frame " << i << " initialized with " << pages[i] << endl;
+		}
+		else {
+			fault = true;
+			for (int j = 0; j < size; j++) {
+				if (pages[i] == frames[j]) {
+					fault = false;
+					cout << "Page " << pages[i] << " found at frame " << j << endl;
+				}
+			}
+			if (fault) {
+				distance.clear();
+				distance = mapping(frames, pages, i + 1);
+				furthest = -1;
+				index = i + 1;
+				for (int distit = 0; distit < distance.size(); ++distit) {
+					if (distance[distit] > furthest) {
+						index = distit;
+						furthest = distance[distit];
+					}
+					else if (distance[distit] == furthest) {
+						if (rand() % 2) {
+							index = distit;
+							furthest = distance[distit];
+						}
+					}
+				}
+				cout << "Page fault!- " << frames[index] << " is being replaced at location "
+					<< index << endl;
+				faultcount++;
+			}
+		}
+		
+	}
+	return faultcount;
+}
+
 int main() {
+	srand(time(NULL));
+	
 	int frames;
 	string reference;
 	vector<int> pages;
-	vector<int> lruFrames;
-	vector<int> optFrames;
+	//vector<int> lruFrames;
+	//vector<int> optFrames;
 	cout << "Input the reference string:\n";
 	getline(cin, reference);
 	cout << "How many frames?\n";
@@ -118,8 +182,11 @@ int main() {
 		}
 	}
 
-	lru(lruFrames, frames, pages);
-	optimal(optFrames, frames, pages);
+	int lrucount = lru(frames, pages);
+	cout << endl << endl;
+	int optcount = optimal(frames, pages);
 
+	cout << "\nLRU had " << lrucount << " page faults.\n";
+	cout << "Optimal had " << optcount << " page faults.";
 	return 0;
 }
